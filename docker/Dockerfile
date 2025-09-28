@@ -1,6 +1,6 @@
 # Using 18 alpine because supports arm/v8 and arm/v8 needed for silicon chips
-FROM node:20-alpine
-RUN apk add --no-cache bash
+FROM node:18-alpine
+RUN apk add --no-cache bash python3 make g++
 WORKDIR /app
 ADD ./ .
 RUN npm install
