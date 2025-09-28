@@ -193,9 +193,10 @@ export async function useBrokerTdAmeritrade(param) {
                     console.log("  --> Account Trade History start row " + accountTradeHistoryStart)
                 }
 
-                if ((element.includes("Options") || element.includes("Futures") || element.includes("Equities") || element.includes("Profits and Losses")) && accountTradeHistoryEnd == 0 && (index - 2) > accountTradeHistoryStart) {
+                if ((element.includes("Profits and Losses") || element.includes("Options")) && accountTradeHistoryEnd == 0 && (index - 2) > accountTradeHistoryStart) {
                     accountTradeHistoryEnd = (index - 2)
                     console.log("  --> Account Trade History end row " + accountTradeHistoryEnd)
+                    console.log("  --> Total Account Trade History lines: " + (accountTradeHistoryEnd - accountTradeHistoryStart + 1))
                 }
             });
 
@@ -205,18 +206,42 @@ export async function useBrokerTdAmeritrade(param) {
                 cashBalanceCsv == undefined ? cashBalanceCsv = element + "\n" : cashBalanceCsv = cashBalanceCsv + element + "\n"
 
             }
+            console.log(`  --> Extracting Account Trade History from line ${accountTradeHistoryStart} to ${accountTradeHistoryEnd}`);
+            let extractedLines = 0;
+            let sampleLines = [];
+            
             for (let index2 = accountTradeHistoryStart; index2 <= accountTradeHistoryEnd; index2++) {
                 const element2 = arrayLines[index2];
                 //console.log("element 2 "+element2)
+                
+                // Collect sample lines for debugging
+                if (extractedLines < 3 || extractedLines > (accountTradeHistoryEnd - accountTradeHistoryStart - 3)) {
+                    sampleLines.push(`Line ${index2}: ${element2 ? element2.substring(0, 100) : 'EMPTY'}`);
+                }
+                
+                // Check for our target line specifically
+                if (element2 && element2.includes("8/6/25") && element2.includes("12:30:55") && element2.includes("INTC")) {
+                    console.log(`  --> FOUND TARGET LINE ${index2}: ${element2}`);
+                }
+                
                 accountTradeHistoryCsv == undefined ? accountTradeHistoryCsv = element2 + "\n" : accountTradeHistoryCsv = accountTradeHistoryCsv + element2 + "\n"
+                extractedLines++;
             }
+            
+            console.log("  --> Sample extracted lines:", sampleLines.slice(0, 5));
+            console.log("  --> Total lines extracted:", extractedLines);
             //console.log("cashBalanceCsv \n" + cashBalanceCsv)
             //console.log("accountTradeHistoryCsv \n" + accountTradeHistoryCsv)
 
 
 
+            console.log("  --> Parsing CSV sections...")
             let papaParseCashBalance = Papa.parse(cashBalanceCsv, { header: true })
             let papaParseAccountTradeHistory = Papa.parse(accountTradeHistoryCsv, { header: true })
+
+            console.log("  --> Papa Parse results - Cash Balance errors:", papaParseCashBalance.errors.length)
+            console.log("  --> Papa Parse results - Account Trade History errors:", papaParseAccountTradeHistory.errors.length)
+            console.log("  --> Raw Account Trade History data length:", papaParseAccountTradeHistory.data.length)
 
             let cashBalanceJsonArrayTemp = papaParseCashBalance.data
             let accountTradeHistoryJsonArrayTemp = papaParseAccountTradeHistory.data.reverse()
@@ -227,10 +252,46 @@ export async function useBrokerTdAmeritrade(param) {
              * CREATING ACCOUNT TRADE HISTORY
              *****************************/
             const keys2 = Object.keys(accountTradeHistoryJsonArrayTemp);
+            console.log("  --> Raw Account Trade History entries before filtering:", accountTradeHistoryJsonArrayTemp.length);
+            
+            let filteredCount = 0;
             for (const key2 of keys2) {
-                if (accountTradeHistoryJsonArrayTemp[key2].hasOwnProperty("Symbol")) {
-                    accountTradeHistoryJsonArray.push(accountTradeHistoryJsonArrayTemp[key2])
+                const entry = accountTradeHistoryJsonArrayTemp[key2];
+                // More robust filtering - check for Symbol OR if it has Exec Time (main identifier)
+                if (entry && (entry.hasOwnProperty("Symbol") || entry.hasOwnProperty("Exec Time") || entry["Exec Time"])) {
+                    // Only exclude completely empty rows
+                    if (entry["Exec Time"] && entry["Exec Time"].trim() !== "") {
+                        accountTradeHistoryJsonArray.push(entry);
+                        
+                        // Log entries around our target date for debugging
+                        if (entry["Exec Time"] && entry["Exec Time"].includes("8/6/25 12:30")) {
+                            console.log(`  --> Found target entry: ${entry["Exec Time"]} ${entry["Symbol"]} ${entry["Qty"]} ${entry["Price"]}`);
+                        }
+                    } else {
+                        filteredCount++;
+                    }
+                } else {
+                    filteredCount++;
                 }
+            }
+            console.log("  --> Filtered out entries:", filteredCount);
+            console.log("  --> Account Trade History entries after filtering:", accountTradeHistoryJsonArray.length);
+            
+            // Check date range of parsed entries
+            const dateEntries = accountTradeHistoryJsonArray
+                .filter(x => x["Exec Time"] && x["Exec Time"].trim())
+                .map(x => x["Exec Time"])
+                .sort();
+            console.log("  --> First parsed entry date:", dateEntries[0]);
+            console.log("  --> Last parsed entry date:", dateEntries[dateEntries.length - 1]);
+            
+            // Specifically look for 8/6/25 entries
+            const aug6Entries = accountTradeHistoryJsonArray.filter(x => 
+                x["Exec Time"] && x["Exec Time"].includes("8/6/25")
+            );
+            console.log("  --> Found 8/6/25 entries:", aug6Entries.length);
+            if (aug6Entries.length > 0) {
+                console.log("  --> Sample 8/6/25 entries:", aug6Entries.slice(0, 3).map(x => `${x["Exec Time"]} ${x["Symbol"]}`));
             }
 
             /*****************************
@@ -406,6 +467,182 @@ export async function useBrokerTdAmeritrade(param) {
                 })
             }
 
+            // Helper function to find matching execution with timestamp tolerance
+            const findMatchingExecution = (targetDateTime, cashBalanceElement, tolerance = 10) => {
+                // Parse the target date and time
+                const [targetDate, targetTime] = targetDateTime.split(' ');
+                const [targetHour, targetMinute, targetSecond] = targetTime.split(':').map(Number);
+                const targetTotalSeconds = targetHour * 3600 + targetMinute * 60 + targetSecond;
+                
+                // Extract symbol and quantity from cash balance description for better matching
+                let targetSymbol = null;
+                let targetQuantity = null;
+                let targetSide = null;
+                let targetPrice = null;
+                
+                const description = cashBalanceElement.DESCRIPTION;
+                if (description) {
+                    // Extract symbol from patterns like "SOLD -42 TSM @220.92" or "BOT +100 TSM @224.9999"
+                    const symbolMatch = description.match(/(?:SOLD|BOT)\s+([+-]?\d+(?:,\d{3})*)\s+([A-Z]+)\s+@([\d,.]+)/);
+                    if (symbolMatch) {
+                        targetQuantity = parseInt(symbolMatch[1].replace(/,/g, ''));
+                        targetSymbol = symbolMatch[2];
+                        targetPrice = parseFloat(symbolMatch[3].replace(/,/g, ''));
+                        targetSide = description.includes('SOLD') ? 'SELL' : 'BUY';
+                    }
+                }
+                
+                // First try exact match with symbol, quantity, and price validation
+                const exactMatches = accountTradeHistoryJsonArray.filter((x, index) => {
+                    if (x["Exec Time"] !== targetDateTime) return false;
+                    if (!targetSymbol || x["Symbol"] !== targetSymbol) return false;
+                    if (targetQuantity && x["Qty"]) {
+                        const execQty = parseInt(x["Qty"].replace(/[+,-]/g, '').replace(/,/g, ''));
+                        if (Math.abs(execQty) !== Math.abs(targetQuantity)) return false;
+                    }
+                    // Try to match price if available
+                    if (targetPrice && x["Price"]) {
+                        const execPrice = parseFloat(x["Price"].replace(/,/g, ''));
+                        const priceDiff = Math.abs(execPrice - targetPrice);
+                        // Allow small price differences due to rounding (up to 0.01)
+                        if (priceDiff > 0.01) return false;
+                    }
+                    return true;
+                });
+                
+                if (exactMatches.length > 0) {
+                    const match = exactMatches[0];
+                    const index = accountTradeHistoryJsonArray.indexOf(match);
+                    console.log(`  --> Found exact match: ${targetDateTime} with symbol ${targetSymbol}, quantity ${targetQuantity}, price ${targetPrice}`);
+                    return { index, element: match };
+                }
+                
+                // If no exact match, try fuzzy matching within tolerance
+                const candidates = [];
+                
+                for (let i = 0; i < accountTradeHistoryJsonArray.length; i++) {
+                    const execTime = accountTradeHistoryJsonArray[i]["Exec Time"];
+                    if (!execTime) continue;
+                    
+                    const [execDate, execTimeStr] = execTime.split(' ');
+                    
+                    // Only check times on the same date
+                    if (execDate === targetDate) {
+                        const [execHour, execMinute, execSecond] = execTimeStr.split(':').map(Number);
+                        const execTotalSeconds = execHour * 3600 + execMinute * 60 + execSecond;
+                        
+                        // Check if within tolerance (in seconds)
+                        const timeDiff = Math.abs(execTotalSeconds - targetTotalSeconds);
+                        if (timeDiff <= tolerance) {
+                            const symbol = accountTradeHistoryJsonArray[i]["Symbol"];
+                            const symbolMatch = !targetSymbol || !symbol || symbol === targetSymbol;
+                            
+                            // Check quantity match if available
+                            let quantityMatch = true;
+                            if (targetQuantity && accountTradeHistoryJsonArray[i]["Qty"]) {
+                                const execQty = parseInt(accountTradeHistoryJsonArray[i]["Qty"].replace(/[+,-]/g, '').replace(/,/g, ''));
+                                quantityMatch = Math.abs(execQty) === Math.abs(targetQuantity);
+                            }
+                            
+                            // Check price match if available
+                            let priceMatch = true;
+                            let priceDiff = 0;
+                            if (targetPrice && accountTradeHistoryJsonArray[i]["Price"]) {
+                                const execPrice = parseFloat(accountTradeHistoryJsonArray[i]["Price"].replace(/,/g, ''));
+                                priceDiff = Math.abs(execPrice - targetPrice);
+                                priceMatch = priceDiff <= 0.01; // Allow small rounding differences
+                            }
+                            
+                            candidates.push({
+                                index: i,
+                                element: accountTradeHistoryJsonArray[i],
+                                timeDiff,
+                                symbolMatch,
+                                quantityMatch,
+                                priceMatch,
+                                priceDiff
+                            });
+                        }
+                    }
+                }
+                
+                if (candidates.length === 0) {
+                    // Last resort: try to find ANY entry with the same symbol and quantity on the same date
+                    console.log(`  --> No candidates within ${tolerance}s tolerance, trying broader search...`);
+                    
+                    if (targetSymbol && targetQuantity) {
+                        const broaderCandidates = [];
+                        
+                        for (let i = 0; i < accountTradeHistoryJsonArray.length; i++) {
+                            const execTime = accountTradeHistoryJsonArray[i]["Exec Time"];
+                            if (!execTime) continue;
+                            
+                            const [execDate] = execTime.split(' ');
+                            
+                            // Same date, same symbol, same quantity
+                            if (execDate === targetDate) {
+                                const symbol = accountTradeHistoryJsonArray[i]["Symbol"];
+                                const qty = accountTradeHistoryJsonArray[i]["Qty"];
+                                
+                                if (symbol === targetSymbol && qty) {
+                                    const execQty = parseInt(qty.replace(/[+,-]/g, '').replace(/,/g, ''));
+                                    if (Math.abs(execQty) === Math.abs(targetQuantity)) {
+                                        // Check price similarity if available
+                                        let priceScore = 0;
+                                        if (targetPrice && accountTradeHistoryJsonArray[i]["Price"]) {
+                                            const execPrice = parseFloat(accountTradeHistoryJsonArray[i]["Price"].replace(/,/g, ''));
+                                            const priceDiff = Math.abs(execPrice - targetPrice);
+                                            priceScore = 1 / (1 + priceDiff); // Higher score for closer prices
+                                        }
+                                        
+                                        broaderCandidates.push({
+                                            index: i,
+                                            element: accountTradeHistoryJsonArray[i],
+                                            priceScore
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (broaderCandidates.length > 0) {
+                            // Sort by price score (best price match first)
+                            broaderCandidates.sort((a, b) => b.priceScore - a.priceScore);
+                            const bestMatch = broaderCandidates[0];
+                            console.log(`  --> Found broader match: ${bestMatch.element["Exec Time"]} for ${targetDateTime} (same date, symbol, quantity)`);
+                            return { index: bestMatch.index, element: bestMatch.element };
+                        }
+                    }
+                    
+                    return null;
+                }
+                
+                // Sort candidates by symbol match, quantity match, price match, then by time and price difference
+                candidates.sort((a, b) => {
+                    if (a.symbolMatch && !b.symbolMatch) return -1;
+                    if (!a.symbolMatch && b.symbolMatch) return 1;
+                    if (a.quantityMatch && !b.quantityMatch) return -1;
+                    if (!a.quantityMatch && b.quantityMatch) return 1;
+                    if (a.priceMatch && !b.priceMatch) return -1;
+                    if (!a.priceMatch && b.priceMatch) return 1;
+                    // If both have price matches, prefer smaller price difference
+                    if (a.priceMatch && b.priceMatch) {
+                        const priceDiffComparison = a.priceDiff - b.priceDiff;
+                        if (Math.abs(priceDiffComparison) > 0.001) return priceDiffComparison;
+                    }
+                    return a.timeDiff - b.timeDiff;
+                });
+                
+                const bestMatch = candidates[0];
+                console.log(`  --> Found fuzzy match: Cash Balance ${targetDateTime} (${targetSymbol} ${targetQuantity} @${targetPrice}) matched with Account Trade History ${bestMatch.element["Exec Time"]} (${bestMatch.timeDiff}s time diff, symbol: ${bestMatch.symbolMatch}, quantity: ${bestMatch.quantityMatch}, price: ${bestMatch.priceMatch})`);
+                
+                return { index: bestMatch.index, element: bestMatch.element };
+            };
+
+            console.log(`\n=== TD AMERITRADE IMPORT DEBUG ===`);
+            console.log(`Cash Balance entries: ${cashBalanceJsonArray.length}`);
+            console.log(`Account Trade History entries: ${accountTradeHistoryJsonArray.length}`);
+            
             cashBalanceJsonArray.forEach(async (element) => {
                 //console.log("\n" + element.DATE + " " + element.TIME)
                 //console.log(" element "+JSON.stringify(element))
@@ -414,20 +651,81 @@ export async function useBrokerTdAmeritrade(param) {
                     await pushTradesData(element, "", 3) // opening underlying stock position
                 } else if (element.DESCRIPTION.includes("REMOVAL")) {
                     await pushTradesData(element, "", 4) // closing option position
+                } else if (element.DESCRIPTION && element.DESCRIPTION.match(/[A-Z]\d+[A-Z]\d+/)) {
+                    // This looks like an option code (e.g., G1281K122), try to match it differently
+                    console.log(`  --> Processing option trade: ${element.DESCRIPTION}`);
+                    await pushTradesData(element, "", 5) // option trade without matching
                 } else {
                     let match = false
-                    let index = accountTradeHistoryJsonArray.findIndex(x => x["Exec Time"] == element.DATE + " " + element.TIME)
-                    if (index != -1) {
-                        let el = accountTradeHistoryJsonArray[index]
+                    const targetDateTime = element.DATE + " " + element.TIME;
+                    
+                    // Special debugging for the problematic entry
+                    if (targetDateTime === "8/6/25 12:30:55") {
+                        console.log(`\n=== DEBUGGING 8/6/25 12:30:55 ===`);
+                        console.log(`Cash Balance entry: ${JSON.stringify(element)}`);
+                        
+                        // Show all Account Trade History entries for this timestamp
+                        const matchingEntries = accountTradeHistoryJsonArray.filter(x => 
+                            x["Exec Time"] && x["Exec Time"].includes("8/6/25 12:30:55")
+                        );
+                        console.log(`Found ${matchingEntries.length} Account Trade History entries for 8/6/25 12:30:55:`);
+                        matchingEntries.forEach((entry, idx) => {
+                            console.log(`  ${idx + 1}: ${JSON.stringify(entry)}`);
+                        });
+                    }
+                    
+                    const matchResult = findMatchingExecution(targetDateTime, element);
+                    
+                    if (matchResult) {
+                        let el = matchResult.element;
                         //console.log(" el " + JSON.stringify(el))
                         //await accountTradeHistoryJsonArray.filter((_, i) => i !== index);
                         //await accountTradeHistoryJsonArray.filter(x => x != el);
-                        await accountTradeHistoryJsonArray.splice(index, 1); // we need to remove the element that has already been parsed in case different executions at same date and time happened
+                        await accountTradeHistoryJsonArray.splice(matchResult.index, 1); // we need to remove the element that has already been parsed in case different executions at same date and time happened
                         await pushTradesData(element, el, 1)
                         match = true
                     } else {
-                        //alert("No matching execution in Account Trade History for execution in Cash Balance on " + element.DATE + " " + element.TIME + ". Please correct your file manually and upload it again.")
-                        reject("No matching execution in Account Trade History for execution in Cash Balance on " + element.DATE + " " + element.TIME + ". Please correct your file manually and upload it again.")
+                        console.log(`  --> No matching execution found for Cash Balance entry: ${targetDateTime}`);
+                        console.log(`  --> Description: ${element.DESCRIPTION}`);
+                        console.log(`  --> Available Account Trade History entries around this time:`);
+                        
+                        // Show nearby entries for debugging
+                        const [targetDate, targetTime] = targetDateTime.split(' ');
+                        const nearbyEntries = accountTradeHistoryJsonArray.filter(x => {
+                            return x["Exec Time"] && x["Exec Time"].startsWith(targetDate);
+                        }).slice(0, 10);
+                        
+                        nearbyEntries.forEach(entry => {
+                            console.log(`    - ${entry["Exec Time"]} | ${entry["Symbol"]} | ${entry["Qty"]} | ${entry["Price"]}`);
+                        });
+                        
+                        // If no match found, check if this is a date that might not be in Account Trade History
+                        const [checkDate] = targetDateTime.split(' ');
+                        const hasEntriesForDate = accountTradeHistoryJsonArray.some(x => 
+                            x["Exec Time"] && x["Exec Time"].startsWith(checkDate)
+                        );
+                        
+                        if (!hasEntriesForDate) {
+                            // No entries for this date in Account Trade History, process without matching
+                            console.log(`  --> No Account Trade History entries for ${checkDate}, processing Cash Balance entry standalone`);
+                            await pushTradesData(element, "", 6) // standalone trade without Account Trade History match
+                        } else {
+                            // There should be entries for this date, but we couldn't find a match - this is an error
+                            const debugInfo = {
+                                cashBalanceEntries: cashBalanceJsonArray.length,
+                                accountTradeHistoryEntries: accountTradeHistoryJsonArray.length,
+                                accountTradeHistoryStart: accountTradeHistoryStart,
+                                accountTradeHistoryEnd: accountTradeHistoryEnd,
+                                totalParsedLines: accountTradeHistoryEnd - accountTradeHistoryStart + 1,
+                                targetDateTime: targetDateTime,
+                                description: element.DESCRIPTION,
+                                matchingTimestamps: accountTradeHistoryJsonArray.filter(x => x["Exec Time"] && x["Exec Time"].includes("8/6/25 12:30:55")).length,
+                                sampleEntries: accountTradeHistoryJsonArray.slice(0, 3).map(x => `${x["Exec Time"]} ${x["Symbol"]} ${x["Qty"]} ${x["Price"]}`),
+                                lastEntries: accountTradeHistoryJsonArray.slice(-3).map(x => `${x["Exec Time"]} ${x["Symbol"]} ${x["Qty"]} ${x["Price"]}`)
+                            };
+                            const diagnosticInfo = `DEBUG: ${JSON.stringify(debugInfo)}`;
+                            reject("No matching execution in Account Trade History for execution in Cash Balance on " + targetDateTime + ". " + diagnosticInfo + " Please correct your file manually and upload it again.")
+                        }
                     }
                 }
             });
