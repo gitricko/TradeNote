@@ -65,6 +65,6 @@ jobs:
           file: ./docker/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository | toLower }}:latest
+            ghcr.io/${{ github.repository | toLower }}:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
