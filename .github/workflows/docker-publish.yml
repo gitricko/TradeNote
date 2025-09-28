@@ -51,11 +51,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase repository name
+        run: |
+          echo "LOWERCASE_REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          ghcr.io/${{ format('{0}', github.repository) }}
+          images: ghcr.io/${{ env.LOWERCASE_REPO }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -65,6 +69,6 @@ jobs:
           file: ./docker/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ format('{0}', github.repository) }}:latest
-            ghcr.io/${{ format('{0}', github.repository) }}:${{ github.sha }}
+            ghcr.io/${{ env.LOWERCASE_REPO }}:latest
+            ghcr.io/${{ env.LOWERCASE_REPO }}:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
