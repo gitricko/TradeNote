@@ -3,12 +3,39 @@ name: Build and Push Docker Image
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   release:
     types: [ published ]
 
 jobs:
-  build-and-push:
+
+  build-test:
     runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -f ./docker/Dockerfile -t tradenode:test .
+          
+      - name: Test Docker image
+        run: |
+          docker run --rm tradenode:test > /tmp/test.log
+          
+          if grep -q "CONNECTING TO MONGODB" /tmp/test.log; then
+            echo "Build successful"
+          else
+            echo "Build failed!"
+            exit 1
+          fi
+        
+  push-to-ghcr:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: build-test
     permissions:
       contents: read
       packages: write
@@ -30,10 +57,12 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
+          file: ./docker/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:latest
