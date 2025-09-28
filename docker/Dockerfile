@@ -12,6 +12,5 @@ RUN npm run build
 FROM node:18-alpine
 RUN apk add --no-cache bash
 WORKDIR /app
-ADD ./ .
-COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app /app
 CMD ["npm", "start"]
