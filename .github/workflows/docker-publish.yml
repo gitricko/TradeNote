@@ -34,7 +34,7 @@ jobs:
         
   push-to-ghcr:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # if: github.ref == 'refs/heads/main'
     needs: build-test
     permissions:
       contents: read
