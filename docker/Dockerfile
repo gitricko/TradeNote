@@ -1,6 +1,6 @@
 # Using 18 alpine because supports arm/v8 and arm/v8 needed for silicon chips
 
-# Builder stage with build tools
+# Builder stage with build tools - especially for node-gyp in arm64
 FROM node:18-alpine AS builder
 RUN apk add --no-cache bash python3 make g++
 WORKDIR /app
