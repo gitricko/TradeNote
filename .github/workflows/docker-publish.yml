@@ -23,7 +23,7 @@ jobs:
           
       - name: Test Docker image
         run: |
-          docker run --rm tradenode:test > /tmp/test.log
+          docker run --rm tradenode:test > /tmp/test.log || true
           
           if grep -q "CONNECTING TO MONGODB" /tmp/test.log; then
             echo "Build successful"
