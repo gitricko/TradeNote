@@ -1,5 +1,5 @@
 # Using 18 alpine because supports arm/v8 and arm/v8 needed for silicon chips
-FROM node:18-alpine
+FROM node:20-alpine
 RUN apk add --no-cache bash
 WORKDIR /app
 ADD ./ .
