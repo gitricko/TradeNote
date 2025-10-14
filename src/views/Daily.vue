@@ -831,13 +831,6 @@ function getOHLC(date, symbol, type) {
                                                     :data-index="index" class="ms-2 uil uil-tag-alt pointerClass"></i>
 
                                             </div>
-                                            <div class="col-12 col-lg-auto ms-auto">P&L({{ selectedGrossNet.charAt(0)
-                                                }}):
-                                                <span
-                                                    v-bind:class="[itemTrade.pAndL[amountCase + 'Proceeds'] > 0 ? 'greenTrade' : 'redTrade']">{{
-                                                        useTwoDecCurrencyFormat(itemTrade.pAndL[amountCase + 'Proceeds'])
-                                                    }}</span>
-                                            </div>
                                             <div class="col-12 col-lg-auto ms-auto">P/L Ratio:
                                                 <span
                                                     v-bind:class="[itemTrade.pAndL.grossWinsCount/(itemTrade.pAndL.grossWinsCount+itemTrade.pAndL.grossLossCount) < 0.5 && getPLRatio(itemTrade) < 1.0 ? 'redTrade' : 'greenTrade']">{{
