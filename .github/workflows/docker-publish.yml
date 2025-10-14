@@ -34,7 +34,7 @@ jobs:
         
   push-to-ghcr:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # if: github.ref == 'refs/heads/main'
     needs: build-test
     permissions:
       contents: read
@@ -63,6 +63,16 @@ jobs:
         run: |
           echo "LOWERCASE_REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      - name: Set IMAGE_TAG for build-test
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "IMAGE_TAG=test" >> $GITHUB_ENV
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+          else
+            echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
+          fi
+
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -77,6 +87,6 @@ jobs:
           file: ./docker/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ env.LOWERCASE_REPO }}:latest
+            ghcr.io/${{ env.LOWERCASE_REPO }}:${{ env.IMAGE_TAG }}
             ghcr.io/${{ env.LOWERCASE_REPO }}:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
