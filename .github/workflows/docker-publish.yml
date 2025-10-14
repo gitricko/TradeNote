@@ -13,6 +13,10 @@ on:
         description: 'Set to "yes" to push tag :test image to GHCR for testing before merging to main'
         required: false
         default: 'no'
+        type: choice
+        options:
+          - 'no'
+          - 'yes'
 
 jobs:
 
@@ -40,7 +44,10 @@ jobs:
         
   push-to-ghcr:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # Run if on main branch, or if manual_push is yes from workflow_dispatch
+    if: >-
+      (github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.manual_push == 'yes')
     needs: build-test
     permissions:
       contents: read
@@ -69,6 +76,14 @@ jobs:
         run: |
           echo "LOWERCASE_REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      - name: Set IMAGE_TAG for build-test
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.manual_push }}" = "yes" ]; then
+            echo "IMAGE_TAG=test" >> $GITHUB_ENV
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+          fi
+
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -83,6 +98,6 @@ jobs:
           file: ./docker/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ env.LOWERCASE_REPO }}:latest
+            ghcr.io/${{ env.LOWERCASE_REPO }}:${{ env.IMAGE_TAG }}
             ghcr.io/${{ env.LOWERCASE_REPO }}:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}

@@ -393,6 +393,36 @@ const checkDate = ((param1, param2) => {
     return check
 })
 
+// Compute P/L Ratio for a daily itemTrade (avg win per share / avg loss per share)
+const getPLRatio = (itemTrade) => {
+    try {
+        if (!itemTrade || !itemTrade.pAndL) return '-'
+        const p = itemTrade.pAndL
+        const pref = amountCase && amountCase.value ? amountCase.value : amountCase
+
+        const winSum = p[pref + 'SharePLWins'] || p[pref + 'SharePLWins'] === 0 ? p[pref + 'SharePLWins'] : null
+        const winCount = p[pref + 'WinsCount'] || p[pref + 'WinsCount'] === 0 ? p[pref + 'WinsCount'] : null
+        const lossSum = p[pref + 'SharePLLoss'] || p[pref + 'SharePLLoss'] === 0 ? p[pref + 'SharePLLoss'] : null
+        const lossCount = p[pref + 'LossCount'] || p[pref + 'LossCount'] === 0 ? p[pref + 'LossCount'] : null
+
+        if (!winSum || !winCount || !lossSum || !lossCount) {
+            // Fallback: try keys without 'SharePL' prefix (older structures)
+            const altWinSum = p[pref + 'Wins'] || p[pref + 'Wins'] === 0 ? p[pref + 'Wins'] : null
+            const altLossSum = p[pref + 'Loss'] || p[pref + 'Loss'] === 0 ? p[pref + 'Loss'] : null
+            if (altWinSum == null || altLossSum == null || winCount == 0 || lossCount == 0) return '-'
+        }
+
+        const avgWinPerShare = (winSum / winCount)
+        const avgLossPerShare = (-(lossSum) / lossCount)
+
+        if (!isFinite(avgWinPerShare) || !isFinite(avgLossPerShare) || avgLossPerShare === 0) return '-'
+
+        return (avgWinPerShare / avgLossPerShare).toFixed(2)
+    } catch (e) {
+        return '-'
+    }
+}
+
 /**************
  * SATISFACTION
  ***************/
@@ -801,11 +831,10 @@ function getOHLC(date, symbol, type) {
                                                     :data-index="index" class="ms-2 uil uil-tag-alt pointerClass"></i>
 
                                             </div>
-                                            <div class="col-12 col-lg-auto ms-auto">P&L({{ selectedGrossNet.charAt(0)
-                                                }}):
+                                            <div class="col-12 col-lg-auto ms-auto">P/L Ratio:
                                                 <span
-                                                    v-bind:class="[itemTrade.pAndL[amountCase + 'Proceeds'] > 0 ? 'greenTrade' : 'redTrade']">{{
-                                                        useTwoDecCurrencyFormat(itemTrade.pAndL[amountCase + 'Proceeds'])
+                                                    v-bind:class="[itemTrade.pAndL.grossWinsCount/(itemTrade.pAndL.grossWinsCount+itemTrade.pAndL.grossLossCount) < 0.5 && getPLRatio(itemTrade) < 1.0 ? 'redTrade' : 'greenTrade']">{{
+                                                        getPLRatio(itemTrade)
                                                     }}</span>
                                             </div>
 
@@ -882,8 +911,8 @@ function getOHLC(date, symbol, type) {
                                                         </div>
                                                         <div>
                                                             <label>P&L(g)</label>
-                                                            <p>{{ useTwoDecCurrencyFormat(itemTrade.pAndL.grossProceeds)
-                                                                }}
+                                                            <p v-bind:class="[itemTrade.pAndL[amountCase + 'Proceeds'] > 0 ? 'greenTrade' : 'redTrade']">
+                                                                {{ useTwoDecCurrencyFormat(itemTrade.pAndL.grossProceeds) }}
                                                             </p>
                                                         </div>
                                                     </div>
