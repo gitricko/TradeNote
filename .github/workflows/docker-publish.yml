@@ -13,6 +13,10 @@ on:
         description: 'Set to "yes" to push tag :test image to GHCR for testing before merging to main'
         required: false
         default: 'no'
+        type: choice
+        options:
+          - no
+          - yes
 
 jobs:
 
