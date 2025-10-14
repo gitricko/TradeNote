@@ -840,7 +840,7 @@ function getOHLC(date, symbol, type) {
                                             </div>
                                             <div class="col-12 col-lg-auto ms-auto">P/L Ratio:
                                                 <span
-                                                    v-bind:class="[itemTrade.pAndL.grossWinsCount/(temTrade.pAndL.grossWinsCount+temTrade.pAndL.grossLossCount) >=0.5 && getPLRatio(itemTrade) >= 1.0 ? 'greenTrade' : 'redTrade']">{{
+                                                    v-bind:class="[itemTrade.pAndL.grossWinsCount/(itemTrade.pAndL.grossWinsCount+itemTrade.pAndL.grossLossCount) >=0.5 && getPLRatio(itemTrade) >= 1.0 ? 'greenTrade' : 'redTrade']">{{
                                                         useTwoDecCurrencyFormat(getPLRatio(itemTrade))
                                                     }}</span>
                                             </div>
