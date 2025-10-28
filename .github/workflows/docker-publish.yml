@@ -3,8 +3,18 @@ name: Build and Push Docker Image
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'brokers/**'
+      - 'README.md'
+      - '.gitignore'
+
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - 'brokers/**'
+      - 'README.md'
+      - '.gitignore'
+
   release:
     types: [ published ]
   workflow_dispatch:
