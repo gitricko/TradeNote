@@ -423,6 +423,32 @@ const getPLRatio = (itemTrade) => {
     }
 }
 
+// Compute percentage gain/loss for a closed trade
+const getPercentageGainLoss = (trade) => {
+    try {
+        if (trade.tradesCount == 0) return '-'
+
+        if (!trade.entryPrice || !trade.exitPrice || trade.entryPrice === 0) return '-'
+
+        let percentage;
+        if (trade.side === 'B') {
+            // Long position: (exit - entry) / entry * 100
+            percentage = ((trade.exitPrice - trade.entryPrice) / trade.entryPrice) * 100
+        } else if (trade.side === 'S') {
+            // Short position: (entry - exit) / entry * 100
+            percentage = ((trade.entryPrice - trade.exitPrice) / trade.entryPrice) * 100
+        } else {
+            return '-'
+        }
+
+        if (!isFinite(percentage)) return '-'
+
+        return percentage.toFixed(2) + '%'
+    } catch (e) {
+        return '-'
+    }
+}
+
 /**************
  * SATISFACTION
  ***************/
@@ -981,6 +1007,10 @@ function getOHLC(date, symbol, type) {
                                                                     data-bs-toggle="tooltip"
                                                                     data-bs-title="Profit&Loss per unit of security traded (baught or shorted)"></i>
                                                             </th>
+                                                            <th scope="col">%<i class="ps-1 uil uil-info-circle"
+                                                                    data-bs-toggle="tooltip"
+                                                                    data-bs-title="Percentage gain/loss: ((Exit - Entry) / Entry) * 100 (long) or ((Entry - Exit) / Entry) * 100 (short)"></i>
+                                                            </th>
                                                             <th scope="col">P&L(n)</th>
                                                             <th scope="col">Tags</th>
                                                             <th scope="col">Note</th>
@@ -1039,6 +1069,14 @@ function getOHLC(date, symbol, type) {
                                                                     v-bind:class="[trade.grossSharePL > 0 ? 'greenTrade' : 'redTrade']">{{
                                                                         useTwoDecCurrencyFormat(trade.grossSharePL)
                                                                     }}</span>
+                                                            </td>
+
+                                                            <!--Percentage Gain/Loss-->
+                                                            <td>
+                                                                <span v-if="trade.tradesCount == 0"></span><span v-else
+                                                                    v-bind:class="[getPercentageGainLoss(trade).replace('%', '') != getPercentageGainLoss(trade) ? (parseFloat(getPercentageGainLoss(trade)) > 0 ? 'greenTrade' : 'redTrade') : '']">
+                                                                    {{ getPercentageGainLoss(trade) }}
+                                                                </span>
                                                             </td>
 
                                                             <!--P&L-->
@@ -1214,6 +1252,10 @@ function getOHLC(date, symbol, type) {
                                     <th scope="col">Price</th>
                                     <th scope="col">Duration</th>
                                     <th scope="col">P&L/Vol</th>
+                                    <th scope="col">%<i class="ps-1 uil uil-info-circle"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-title="Percentage gain/loss: ((Exit - Entry) / Entry) * 100 (long) or ((Entry - Exit) / Entry) * 100 (short)"></i>
+                                    </th>
                                     <th scope="col">P/L(n)</th>
                                 </tr>
                             </thead>
@@ -1301,6 +1343,16 @@ function getOHLC(date, symbol, type) {
                                             v-else
                                             v-bind:class="[(filteredTrades[itemTradeIndex].trades[tradeIndex].grossSharePL) > 0 ? 'greenTrade' : 'redTrade']">{{
                                                 useTwoDecCurrencyFormat(filteredTrades[itemTradeIndex].trades[tradeIndex].grossSharePL)
+                                            }}</span>
+                                    </td>
+
+                                    <!--Percentage Gain/Loss-->
+                                    <td><span
+                                            v-if="filteredTrades[itemTradeIndex].trades[tradeIndex].tradesCount == 0"></span><span
+                                            v-else
+                                            v-bind:class="[(filteredTrades[itemTradeIndex].trades[tradeIndex].side == 'B' ? (filteredTrades[itemTradeIndex].trades[tradeIndex].exitPrice - filteredTrades[itemTradeIndex].trades[tradeIndex].entryPrice) : (filteredTrades[itemTradeIndex].trades[tradeIndex].entryPrice - filteredTrades[itemTradeIndex].trades[tradeIndex].exitPrice)) > 0 ? 'greenTrade' : 'redTrade']">
+                                            {{
+                                                getPercentageGainLoss(filteredTrades[itemTradeIndex].trades[tradeIndex])
                                             }}</span>
                                     </td>
 
