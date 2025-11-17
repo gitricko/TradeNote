@@ -10,7 +10,7 @@ mongo-restart: mongo-stop mongo-start
 
 mongo-reset: mongo-stop
 	docker rm -f tradenote_db
-	mongo-start
+	$(MAKE) mongo-start
 
 node-env-prep:
 	. $$NVM_DIR/nvm.sh; nvm install 18
@@ -20,8 +20,8 @@ node-env-prep:
 node-build: node-env-prep
 	. $$NVM_DIR/nvm.sh; nvm use 18; npm run build
 
-dev-start: mongo-start node-env-prep
+dev-start: mongo-start node-build
 	. $$NVM_DIR/nvm.sh; nvm use 18; \
 	MONGO_URI=mongodb://tradenote:tradenote@localhost:27017/tradenote?authSource=admin \
 	TRADENOTE_DATABASE=tradenote APP_ID=123456 MASTER_KEY=123456 TRADENOTE_PORT=8080 \
-	npm start
+	npm run start
