@@ -39,13 +39,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: npm install
-        run: |
-          npm install
-  
       - name: npm run build
         run: |
-          npm run build
+          make node-build
 
       - name: npm run preview
         run: |
