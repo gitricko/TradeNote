@@ -32,6 +32,25 @@ on:
 
 jobs:
 
+  build-local:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: npm install
+        run: |
+          npm install
+  
+      - name: npm run build
+        run: |
+          npm run build
+
+      - name: npm run preview
+        run: |
+          npm run preview -- --port 8080 & sleep 10; curl -f http://localhost:8080 || exit 1
+      
   build-test:
     runs-on: ubuntu-latest
     
