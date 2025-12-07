@@ -965,7 +965,7 @@ export async function useSetValues() {
         if (!localStorage.getItem('selectedPlSatisfaction')) localStorage.setItem('selectedPlSatisfaction', "pl")
         selectedPlSatisfaction.value = localStorage.getItem('selectedPlSatisfaction')
 
-        if (!localStorage.getItem('selectedBroker')) localStorage.setItem('selectedBroker', "tradeZero")
+        if (!localStorage.getItem('selectedBroker')) localStorage.setItem('selectedBroker', "tdAmeritrade")
         selectedBroker.value = localStorage.getItem('selectedBroker')
 
         if (!localStorage.getItem('selectedDateRange')) localStorage.setItem('selectedDateRange', JSON.stringify({ start: periodRange.filter(element => element.value == 'thisMonth')[0].start, end: periodRange.filter(element => element.value == 'thisMonth')[0].end }))
