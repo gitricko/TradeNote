@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeMount, onMounted, computed, reactive, ref } from 'vue';
+import { onBeforeMount, onMounted, computed, reactive, ref, nextTick } from 'vue';
 import Filters from '../components/Filters.vue'
 import NoData from '../components/NoData.vue';
 import SpinnerLoadingPage from '../components/SpinnerLoadingPage.vue';
@@ -128,16 +128,22 @@ async function clickTradesModal(param1, param2, param3) {
         if (tradeNoteChanged.value) {
             await useUpdateNote()
             await useGetNotes()
+            await nextTick()
+            await useInitTooltip()
         }
 
         if (tradeExcursionChanged.value) {
             await updateExcursions()
+            await nextTick()
+            await useInitTooltip()
         }
 
         if (tradeTagsChanged.value) {
             await Promise.all([useUpdateAvailableTags(), useUpdateTags()])
             await Promise.all([useGetTags(), useGetAvailableTags()])
             useCreateAvailableTagsArray()
+            await nextTick()
+            await useInitTooltip()
         }
 
         if (tradeScreenshotChanged.value) {
@@ -171,6 +177,8 @@ async function clickTradesModal(param1, param2, param3) {
             tradesModal.hide()
             await (modalDailyTradeOpen.value = false) //this is important because we use itemTradeIndex on filteredTrades and if change month, this causes problems. So only show modal content when clicked on open modal/v-if
             await useInitTab("daily")
+            await nextTick()
+            await useInitTooltip()
             loadScreenshots = false
             initCandleChart = true
         }

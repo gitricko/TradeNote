@@ -713,6 +713,12 @@ export function useInitTooltip() {
     //console.log(" -> Init Tooltip")
     let tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
     tooltipTriggerList.map((tooltipTriggerEl) => {
+        // Dispose of existing tooltip if it exists
+        let existingTooltip = bootstrap.Tooltip.getInstance(tooltipTriggerEl)
+        if (existingTooltip) {
+            existingTooltip.dispose()
+        }
+        // Create new tooltip
         return new bootstrap.Tooltip(tooltipTriggerEl)
     })
 
