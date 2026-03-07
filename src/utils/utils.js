@@ -883,6 +883,7 @@ export async function useLoadMore() {
         await useGetFilteredTradesForDaily()
         await Promise.all([useRenderDoubleLineChart(), useRenderPieChart()])
         await useInitTab("daily")
+        await useInitTooltip()
         //await useGetDiaries(true)
         //await (renderingCharts.value = false)
     }

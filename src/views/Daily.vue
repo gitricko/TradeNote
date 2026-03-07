@@ -1066,7 +1066,10 @@ function getOHLC(date, symbol, type) {
                                                             <td>
                                                                 <span
                                                                     v-for="note in notes.filter(obj => obj.tradeId == trade.id)">
-                                                                    <span v-if="note.note.length > 12">{{
+                                                                    <span v-if="note.note.length > 12"
+                                                                        data-bs-toggle="tooltip"
+                                                                        data-bs-html="true"
+                                                                        v-bind:data-bs-title="note.note">{{
                                                                         note.note.substring(0, 12) }}...</span><span
                                                                         v-else>{{ note.note }}</span>
                                                                 </span>
