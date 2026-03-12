@@ -996,7 +996,10 @@ export async function useSetValues() {
 
         if (Object.is(localStorage.getItem('selectedAccounts'), null) && currentUser.value && currentUser.value.hasOwnProperty("accounts") && currentUser.value.accounts.length > 0) {
             currentUser.value.accounts.forEach(element => {
-                selectedAccounts.value.push(element.value)
+                if (element && element.value) {
+                    const acct = element.value.toString().trim()
+                    if (acct) selectedAccounts.value.push(acct)
+                }
             });
             //console.log("selected accounts " + JSON.stringify(selectedAccounts))
             localStorage.setItem('selectedAccounts', selectedAccounts.value)

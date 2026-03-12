@@ -10,6 +10,7 @@ mongo-restart: mongo-stop mongo-start
 
 mongo-reset: mongo-stop
 	docker rm -f tradenote_db
+	docker volume rm -f $$(docker volume ls)
 	$(MAKE) mongo-start
 
 node-env-prep:
