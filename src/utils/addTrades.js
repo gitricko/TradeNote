@@ -81,6 +81,9 @@ export async function useGetExistingTradesArray(param99, param0) {
 
 export async function useImportTrades(param1, param2, param3, param0) {
     return new Promise(async (resolve, reject) => {
+        // reset accounts list for this import to avoid duplicates from previous files
+        tradeAccounts.length = 0
+
         //console.log("param1 " + param1)
         //console.log("param2 " + param2)
         //console.log("param3 " + param3)
@@ -394,9 +397,13 @@ async function createTempExecutions() {
         for (const key of keys) {
             try {
                 let temp2 = {};
-                temp2.account = tradesData[key].Account
+                // normalise account and drop blanks
+                let acctVal = tradesData[key].Account ? tradesData[key].Account.toString().trim() : ""
+                temp2.account = acctVal
                 temp2.broker = selectedBroker.value
-                if (!tradeAccounts.includes(tradesData[key].Account)) tradeAccounts.push(tradesData[key].Account)
+                if (acctVal && !tradeAccounts.includes(acctVal)) {
+                    tradeAccounts.push(acctVal)
+                }
                 /*usDate = dayjs.tz("07/22/2021 00:00:00", 'MM/DD/YYYY 00:00:00', "UTC")
                 //frDate = usDate.tz("Europe/Paris")
                 console.log("date "+usDate+" and fr ")*/
@@ -2101,8 +2108,14 @@ export async function useUploadTrades(param99, param0) {
                 const results = await query.first(param99 === "api" ? { useMasterKey: true } : undefined);
                 //console.log(" results "+JSON.stringify(results))
                 if (results) {
-                    results.set("accounts", param)
-                    //console.log("param 2" + JSON.stringify(param2))
+                    // remove any empty account objects before saving
+                const cleanAccounts = Array.isArray(param)
+                    ? param.filter(a => a && a.value && a.value.toString().trim())
+                    : param
+                results.set("accounts", cleanAccounts)
+                // update local user copy so subsequent imports see the change
+                currentUser.value.accounts = cleanAccounts
+                //console.log("param 2" + JSON.stringify(param2))
                     if (param99 === "api") {
                         await results.save(null, { useMasterKey: true }) //very important to have await or else too quick to update
                     } else {
@@ -2123,8 +2136,10 @@ export async function useUploadTrades(param99, param0) {
                         } else {
                             selectedItemsArray = []
                         }
-                        //console.log(" selected items value " + JSON.stringify(selectedItemsArray))
-                        selectedItemsArray.push(param2)
+                        // only add the entry if it isn't already present and not empty
+                        if (param2 && !selectedItemsArray.includes(param2)) {
+                            selectedItemsArray.push(param2)
+                        }
                         localStorage.setItem(selectedItems, selectedItemsArray)
                         //console.log(" -> Updated selectedItems / localstorage " + selectedItemsArray)
                     }
@@ -2135,25 +2150,28 @@ export async function useUploadTrades(param99, param0) {
 
             if (currentUser.value.accounts) {
                 tradeAccounts.forEach(element => {
-                    let check = currentUser.value.accounts.find(x => x.value == element)
-                    //console.log("check "+JSON.stringify(check))
+                    const acct = (typeof element === 'string' ? element.trim() : element)
+                    if (!acct) return // skip blank
+                    let check = currentUser.value.accounts.find(x => x.value == acct)
                     if (!check) {
-                        let tempArray = currentUser.value.accounts
+                        let tempArray = currentUser.value.accounts.slice() // copy existing array
                         let temp = {}
-                        temp.value = tradeAccounts[0]
-                        temp.label = tradeAccounts[0]
+                        temp.value = acct
+                        temp.label = acct
                         tempArray.push(temp)
-                        updateTradeAccounts(tempArray, temp.value)
+                        updateTradeAccounts(tempArray, acct)
                     }
                 });
             } else {
                 let tempArray = []
                 tradeAccounts.forEach(element => {
+                    const acct = (typeof element === 'string' ? element.trim() : element)
+                    if (!acct) return
                     let temp = {}
-                    temp.value = element
-                    temp.label = element
+                    temp.value = acct
+                    temp.label = acct
                     tempArray.push(temp)
-                    updateTradeAccounts(tempArray, temp.value)
+                    updateTradeAccounts(tempArray, acct)
                 })
             }
         })
